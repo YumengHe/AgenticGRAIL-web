@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>GRAIL to Franka Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a lab report. A pipeline map up top, then each pipeline step as a row of notes beside its clip; wide clips span the column. */
+:root {
+  --bg: #f2f5f6;
+  --surface: #ffffff;
+  --ink: #152027;
+  --muted: #55636c;
+  --line: #d5dde1;
+  --amber: #9f600a;        /* the drill's yellow band, darkened to read on light */
+  --amber-soft: #f5e6cb;
+  --steel: #255b80;        /* links and the Franka branch */
+  --steel-soft: #dde9f2;
+  --ok: #217449;
+  --ok-soft: #dbeee3;
+  --todo: #6b5a1e;
+  --todo-soft: #efe8cf;
+  --screen: #1c1c1c;       /* behind video letterboxing */
+  --paper: #ffffff;        /* the search chart is drawn on white in both themes */
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1316; --surface: #151c20; --ink: #e3e9ec; --muted: #97a4ac; --line: #28333a;
+    --amber: #ebab40; --amber-soft: #3a2c13; --steel: #8dbbdb; --steel-soft: #182b38;
+    --ok: #5cc58b; --ok-soft: #15301f; --todo: #dcc46e; --todo-soft: #312a12; --screen: #000000;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1316; --surface: #151c20; --ink: #e3e9ec; --muted: #97a4ac; --line: #28333a;
+  --amber: #ebab40; --amber-soft: #3a2c13; --steel: #8dbbdb; --steel-soft: #182b38;
+  --ok: #5cc58b; --ok-soft: #15301f; --todo: #dcc46e; --todo-soft: #312a12; --screen: #000000;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1rem/1.6 var(--body);
+}
+.page {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding-block: 2.5rem 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 4rem;
+}
+a { color: var(--steel); text-underline-offset: 0.18em; }
+a:focus-visible, video:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.05; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.6rem, 6vw, 4.2rem); letter-spacing: 0.005em; }
+h2 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); }
+h3 { font-size: 1.65rem; font-weight: 600; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* Masthead */
+.masthead { display: grid; gap: 1.25rem; }
+.lede { max-width: 66ch; font-size: 1.12rem; color: var(--ink); }
+.status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 0.5rem 0 0;
+}
+.status div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+}
+.status dt { font-weight: 600; }
+.status dd { margin: 0; color: var(--muted); font-size: 0.93rem; }
+.status dd.pill-row { display: flex; }
+.pill {
+  justify-self: start;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.todo { background: var(--todo-soft); color: var(--todo); }
+
+/* Pipeline map */
+.map { display: grid; gap: 1rem; }
+.lane {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+.lane-label { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); padding-top: 0.45rem; }
+.lane-label b { display: block; font-family: var(--body); font-size: 0.95rem; color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem 1.6rem; list-style: none; margin: 0; padding: 0; }
+.chips li { position: relative; }
+.chips li + li::before {
+  content: "\2192";
+  position: absolute;
+  left: -1.25rem;
+  top: 0.38rem;
+  color: var(--muted);
+}
+.chip {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.93rem;
+}
+.chip:hover { border-color: var(--muted); }
+.chip .n { font-family: var(--mono); font-size: 0.78rem; color: var(--amber); }
+.lane.g1 .chip { border-left: 3px solid var(--ink); }
+.lane.franka .chip { border-left: 3px solid var(--steel); }
+.lane.shared .chip { border-left: 3px solid var(--amber); }
+.map-note { font-size: 0.9rem; color: var(--muted); max-width: 70ch; }
+
+/* Sections and steps */
+section { display: grid; gap: 2rem; }
+.section-head { display: grid; gap: 0.6rem; max-width: 70ch; }
+.section-head p { color: var(--muted); }
+.steps { display: grid; gap: 3rem; }
+.step {
+  display: grid;
+  grid-template-columns: minmax(0, 21rem) minmax(0, 1fr);
+  gap: 1.25rem 2.5rem;
+  align-items: start;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--line);
+}
+.step.wide { grid-template-columns: minmax(0, 1fr); }
+.step.wide .notes { max-width: 70ch; }
+.notes { display: grid; gap: 0.85rem; min-width: 0; }
+.step-num { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); letter-spacing: 0.04em; }
+.notes p { color: var(--ink); }
+.facts { display: grid; gap: 0.35rem; margin: 0; }
+.facts div {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding-block: 0.3rem;
+  border-bottom: 1px dashed var(--line);
+  font-size: 0.92rem;
+}
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; font-family: var(--mono); font-size: 0.86rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.change {
+  font-size: 0.93rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 4px;
+  background: var(--amber-soft);
+}
+.change.limit { background: var(--steel-soft); }
+.change b { font-weight: 600; }
+figure { margin: 0; display: grid; gap: 0.5rem; min-width: 0; }
+figure video, figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: min(78vh, 46rem);
+  object-fit: contain;
+  background: var(--screen);
+  border-radius: 4px;
+}
+figure img { background: var(--paper); }
+figcaption { font-size: 0.85rem; color: var(--muted); }
+
+/* The two robots */
+.robots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1.5rem;
+}
+.robot {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+.robot img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; }
+.robot-body { display: grid; gap: 0.8rem; align-content: start; padding: 1.25rem 1.25rem 1.5rem; }
+.robot .facts div { grid-template-columns: 7.5rem minmax(0, 1fr); }
+.overview { display: grid; gap: 2rem; }
+
+/* Fixes table and next steps */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--mono); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td.scope { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.next { display: grid; gap: 0.9rem; margin: 0; padding: 0; list-style: none; max-width: 72ch; }
+.next li { padding-left: 1.25rem; position: relative; }
+.next li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 0.5rem; height: 0.5rem; border: 2px solid var(--amber); border-radius: 50%; }
+footer { display: grid; gap: 0.6rem; font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 1.5rem; }
+footer p { max-width: 80ch; }
+
+@media (max-width: 860px) {
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .lane { grid-template-columns: minmax(0, 1fr); }
+  .lane-label { padding-top: 0; }
+}
+@media (max-width: 480px) {
+  .facts div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow">Research progress &middot; 21&ndash;22 Oct 2026 &middot; one RTX 3090</p>
+  <h1>GRAIL to Franka</h1>
+  <p class="lede">I ran NVIDIA's GRAIL pipeline end to end on a video I generated myself: a kid picking up a cordless drill, turned into motion for the Unitree G1 humanoid. Then I replaced the G1 with a Franka Panda arm and its two-finger gripper, and checked the result in physics simulation. Every step below has the video it produced.</p>
+  <dl class="status">
+    <div>
+      <dt>GRAIL on my own video</dt>
+      <dd class="pill-row"><span class="pill ok">Done</span></dd>
+      <dd>Scene, video, 4D reconstruction and G1 retargeting all run here. NVIDIA's trained policy lifts my drill in physics.</dd>
+    </div>
+    <div>
+      <dt>Franka Panda retargeting</dt>
+      <dd class="pill-row"><span class="pill ok">Done for one motion</span></dd>
+      <dd>The kid's grasp moved onto the Franka gripper and verified in Isaac Lab: the drill is lifted 21 of 22 cm and held.</dd>
+    </div>
+    <div>
+      <dt>Policy training</dt>
+      <dd class="pill-row"><span class="pill todo">Not started</span></dd>
+      <dd>GRAIL's training setup expects 8 GPUs. Short training test runs passed on NVIDIA's data and mine.</dd>
+    </div>
+  </dl>
+</header>
+
+<section id="robots" aria-labelledby="robots-title">
+  <div class="section-head">
+    <p class="eyebrow">The robots</p>
+    <h2 id="robots-title">Two robots, one task</h2>
+    <p>GRAIL was built for a humanoid that copies the whole human body. I am moving it to a robot arm, which only needs the hand and the object. Both pictures come from my own simulation runs.</p>
+  </div>
+  <div class="robots">
+    <article class="robot">
+      <img src="images/robot-g1.jpg" width="900" height="900" alt="The Unitree G1 humanoid standing beside a table, holding an apple up in its right hand.">
+      <div class="robot-body">
+        <p class="eyebrow">GRAIL's robot</p>
+        <h3>Unitree G1 humanoid</h3>
+        <p>A child-sized humanoid robot. GRAIL retargets the person's whole body onto it, so it walks up to the table, keeps its balance and grasps with a three-finger hand. NVIDIA's SONIC trains the policy that controls it.</p>
+        <dl class="facts">
+          <div><dt>Maker</dt><dd>Unitree Robotics</dd></div>
+          <div><dt>Size</dt><dd>about 1.3 m tall, 35 kg</dd></div>
+          <div><dt>Hands</dt><dd>three-finger dexterous hands</dd></div>
+          <div><dt>In simulation</dt><dd>43 joints: 29 body, 7 per hand</dd></div>
+          <div><dt>Controlled by</dt><dd>NVIDIA's SONIC policy in Isaac Lab</dd></div>
+        </dl>
+      </div>
+    </article>
+    <article class="robot">
+      <img src="images/robot-franka.jpg" width="900" height="900" alt="The Franka Panda arm on a stand beside a table, holding the cordless drill up with its two-finger gripper.">
+      <div class="robot-body">
+        <p class="eyebrow">My robot</p>
+        <h3>Franka Panda with Franka Hand</h3>
+        <p>A widely used research arm with seven joints and the standard two-finger parallel gripper. It is fixed in place, so it does not walk or balance. It only needs to know where to grasp and how the object should move.</p>
+        <dl class="facts">
+          <div><dt>Maker</dt><dd>Franka Robotics (formerly Franka Emika)</dd></div>
+          <div><dt>Arm</dt><dd>7 joints, 855 mm reach, 3 kg payload</dd></div>
+          <div><dt>Gripper</dt><dd>two parallel fingers, opens 8 cm, 70 N grip</dd></div>
+          <div><dt>Base</dt><dd>fixed; here on a stand beside the table</dd></div>
+          <div><dt>In simulation</dt><dd>Isaac Lab's Panda model</dd></div>
+        </dl>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section id="setup" aria-labelledby="setup-title">
+  <div class="section-head">
+    <p class="eyebrow">Setup</p>
+    <h2 id="setup-title">How I run GRAIL on one machine</h2>
+    <p>GRAIL assumes paid cloud services and a GPU cluster. Where it needed one, I swapped in a free or local option.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Part</th><th>GRAIL expects</th><th>What I use</th></tr></thead>
+      <tbody>
+        <tr><td>Language and vision models: writing video prompts (step 2) and labeling which body parts touch the object (step 4)</td><td>OpenAI API with a paid key</td><td>CLIProxyAPI, a proxy running on my machine that sends the same OpenAI-style requests through a ChatGPT Plus account, as my mentor chose. GRAIL needed one small change: its model names now come from settings.</td></tr>
+        <tr><td>Video generation (step 2)</td><td>Kling, a paid service</td><td>Wan 2.2 TI2V-5B, open source, on my own GPU</td></tr>
+        <tr><td>Compute</td><td>8 GPUs for policy training</td><td>One RTX 3090 (24 GB), in GRAIL's Docker image</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<nav class="map" aria-label="Pipeline map">
+  <div class="lane shared">
+    <p class="lane-label"><b>Shared</b>robot-agnostic</p>
+    <ul class="chips">
+      <li><a class="chip" href="#grail-1"><span class="n">1</span>Scene render</a></li>
+      <li><a class="chip" href="#grail-2"><span class="n">2</span>Video generation</a></li>
+      <li><a class="chip" href="#grail-3"><span class="n">3</span>Reconstruction steps</a></li>
+      <li><a class="chip" href="#grail-4"><span class="n">4</span>4D reconstruction</a></li>
+    </ul>
+  </div>
+  <div class="lane g1">
+    <p class="lane-label"><b>GRAIL, G1</b>NVIDIA's robot</p>
+    <ul class="chips">
+      <li><a class="chip" href="#grail-5"><span class="n">5</span>Retarget to the G1</a></li>
+      <li><a class="chip" href="#grail-6"><span class="n">6</span>Policy on NVIDIA's data</a></li>
+      <li><a class="chip" href="#grail-7"><span class="n">7</span>Policy on my drill</a></li>
+    </ul>
+  </div>
+  <div class="lane franka">
+    <p class="lane-label"><b>Franka Panda</b>new, grail/franka/</p>
+    <ul class="chips">
+      <li><a class="chip" href="#franka-2"><span class="n">F2</span>Grasp transfer</a></li>
+      <li><a class="chip" href="#franka-3"><span class="n">F3</span>Mount the arm</a></li>
+      <li><a class="chip" href="#franka-4"><span class="n">F4</span>Planned motion</a></li>
+      <li><a class="chip" href="#franka-5"><span class="n">F5</span>Contact settings</a></li>
+      <li><a class="chip" href="#franka-6"><span class="n">F6</span>Physics check</a></li>
+    </ul>
+  </div>
+  <p class="map-note">Steps 1&ndash;4 produce a 4D reconstruction of the person and the object, which does not depend on the robot. GRAIL turns it into G1 motion (steps 5&ndash;7); my new code turns the same reconstruction into Franka motion (F2&ndash;F6).</p>
+</nav>
+
+<section id="overview" aria-labelledby="overview-title">
+  <div class="section-head">
+    <p class="eyebrow">Overview</p>
+    <h2 id="overview-title">From one generated video to two robots</h2>
+    <p>Each clip runs the whole pipeline side by side, about 5 seconds long. Clips play muted while on screen; use the controls to replay or go full screen.</p>
+  </div>
+  <div class="overview">
+    <figure>
+      <video src="videos/grail-00.mp4" poster="posters/grail-00.jpg" width="2372" height="830" controls muted loop playsinline preload="none" data-autoplay></video>
+      <figcaption>GRAIL with the G1: generated video, 4D reconstruction, G1 reference motion, and the G1 in physics simulation with NVIDIA's policy.</figcaption>
+    </figure>
+    <figure>
+      <video src="videos/franka-00.mp4" poster="posters/franka-00.jpg" width="2812" height="830" controls muted loop playsinline preload="none" data-autoplay></video>
+      <figcaption>The same video with the Franka: generated video, 4D reconstruction, the Franka's planned motion, and the Franka in physics simulation.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="grail" aria-labelledby="grail-title">
+  <div class="section-head">
+    <p class="eyebrow">Pipeline 1</p>
+    <h2 id="grail-title">GRAIL with the Unitree G1</h2>
+    <p>NVIDIA's pipeline, run in its Docker image on my machine. Where I had to change something to make a step work, it is marked under the step.</p>
+  </div>
+  <div class="steps">
+
+    <article class="step" id="grail-1">
+      <div class="notes">
+        <p class="step-num">Step 1</p>
+        <h3>Scene render</h3>
+        <p>GRAIL builds a 3D scene in Blender with a person, a table and an object, and renders one image. That image becomes the first frame of the generated video.</p>
+        <dl class="facts">
+          <div><dt>Scene</dt><dd>kid_indoor2-manipulation_rand00001</dd></div>
+          <div><dt>Object</dt><dd>ComAsset cordless drill</dd></div>
+          <div><dt>Renderer</dt><dd>Blender 4.3</dd></div>
+        </dl>
+        <p class="change"><b>My change:</b> pinned Blender's OpenCV below version 5. Version 5 lacks OpenEXR support, so the depth images were silently missing.</p>
+      </div>
+      <figure>
+        <video src="videos/grail-01.mp4" poster="posters/grail-01.jpg" width="1280" height="1390" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step" id="grail-2">
+      <div class="notes">
+        <p class="step-num">Step 2</p>
+        <h3>Video generation</h3>
+        <p>A video model animates the render into a short clip of the person picking up the object. GRAIL uses Kling, a paid service; I use the open-source Wan 2.2 on my own GPU.</p>
+        <dl class="facts">
+          <div><dt>Model</dt><dd>Wan 2.2 TI2V-5B</dd></div>
+          <div><dt>Prompt</dt><dd>written from the render by an OpenAI model, through CLIProxyAPI</dd></div>
+          <div><dt>Clip</dt><dd>121 frames, 24 fps, 720&times;1280</dd></div>
+          <div><dt>Time</dt><dd>&asymp; 18 min per clip</dd></div>
+        </dl>
+        <p class="change"><b>My change:</b> the first clip was rejected because the pickup took about 0.25 s, too fast to track. A slow-paced prompt, plus a negative prompt that no longer penalizes standing still, gave a usable second clip.</p>
+      </div>
+      <figure>
+        <video src="videos/grail-02.mp4" poster="posters/grail-02.jpg" width="1440" height="1390" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Left: first attempt, rejected. Right: second attempt, accepted.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="grail-3">
+      <div class="notes">
+        <p class="step-num">Step 3</p>
+        <h3>Reconstruction steps</h3>
+        <p>GRAIL tracks the person and the object in the video: 2D body keypoints (GEM-SMPL), person and drill masks (SAM2), depth (MoGe) and the drill's 6D pose (FoundationPose). The kid starts reaching for the drill at frame 58.</p>
+      </div>
+      <figure>
+        <video src="videos/grail-03.mp4" poster="posters/grail-03.jpg" width="2160" height="1070" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step" id="grail-4">
+      <div class="notes">
+        <p class="step-num">Step 4</p>
+        <h3>4D human&ndash;object reconstruction</h3>
+        <p>An optimizer fits a 3D body (SMPL-X) and the drill's pose to every frame, with the hand in contact with the drill. GRAIL then rejects reconstructions that fail its quality checks. Mine passed all of them.</p>
+        <dl class="facts">
+          <div><dt>Mask difference</dt><dd>0.094 (limit 0.3)</dd></div>
+          <div><dt>Keypoint tracking</dt><dd>0.71 (limit 2.0)</dd></div>
+          <div><dt>Contact</dt><dd>0.26 (limit 5.0)</dd></div>
+          <div><dt>Object motion</dt><dd>0.0114 (needs &ge; 0.01)</dd></div>
+          <div><dt>Contact labels</dt><dd>from an OpenAI model, through CLIProxyAPI</dd></div>
+          <div><dt>Time</dt><dd>&asymp; 22 min</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <video src="videos/grail-04.mp4" poster="posters/grail-04.jpg" width="2160" height="1390" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Generated video, 3D body and drill drawn over it, and a top view.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step" id="grail-5">
+      <div class="notes">
+        <p class="step-num">Step 5</p>
+        <h3>Retarget to the G1</h3>
+        <p>GMR maps the human motion onto the Unitree G1. GRAIL then adds hand open/close actions, the table and the object's shape codes. The clip plays the motion back without physics.</p>
+        <dl class="facts">
+          <div><dt>Lift starts</dt><dd>frame 64</dd></div>
+        </dl>
+        <p class="change"><b>My change:</b> in this scene the table is part of the room model, so GRAIL never recorded it and training stopped with a missing-table error. I add the table at the drill's starting height.</p>
+      </div>
+      <figure>
+        <video src="videos/grail-05.mp4" poster="posters/grail-05.jpg" width="1080" height="1070" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step" id="grail-6">
+      <div class="notes">
+        <p class="step-num">Step 6</p>
+        <h3>NVIDIA's policy on NVIDIA's data</h3>
+        <p>SONIC trains a G1 policy in Isaac Lab that tracks the motion with full physics. Training needs 8 GPUs, so I ran NVIDIA's released tabletop pickup policy on 4 of their 2,991 released motions.</p>
+        <dl class="facts">
+          <div><dt>Success</dt><dd>4 of 4</dd></div>
+          <div><dt>Joint error</dt><dd>apple 77.0 mm, kettle 102.5 mm, mug 37.6 mm, potato 31.5 mm</dd></div>
+          <div><dt>Training test</dt><dd>3 iterations, no errors</dd></div>
+        </dl>
+        <p class="change"><b>My change:</b> the kettle was missing from the first version of this clip, though the robot still lifted it. 448 of NVIDIA's 2,991 object models use a see-through material that Isaac Sim draws invisible. I now render with opaque copies; the physics results are unchanged.</p>
+      </div>
+      <figure>
+        <video src="videos/grail-06.mp4" poster="posters/grail-06.jpg" width="1920" height="1198" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step" id="grail-7">
+      <div class="notes">
+        <p class="step-num">Step 7</p>
+        <h3>NVIDIA's policy on my drill</h3>
+        <p>The same released policy, run on the motion from my own video. The G1 grasps the drill and lifts it through the whole motion.</p>
+        <dl class="facts">
+          <div><dt>Result</dt><dd>full motion, drill lifted</dd></div>
+          <div><dt>Joint error</dt><dd>69.2 mm</dd></div>
+          <div><dt>Training test</dt><dd>3 iterations on my motion, no errors</dd></div>
+        </dl>
+        <p class="change"><b>My change:</b> the first run stopped on frame 0 because the G1's hand touched the table. Placing the table's near edge 3 cm past the drill's base fixed it.</p>
+      </div>
+      <figure>
+        <video src="videos/grail-07.mp4" poster="posters/grail-07.jpg" width="1920" height="1198" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+  </div>
+</section>
+
+<section id="franka" aria-labelledby="franka-title">
+  <div class="section-head">
+    <p class="eyebrow">Pipeline 2</p>
+    <h2 id="franka-title">The new Franka Panda pipeline</h2>
+    <p>Steps 1&ndash;4 are unchanged. The new code in <code>grail/franka/</code> replaces steps 5&ndash;7 for a Franka Panda with its standard two-finger gripper, simulated in Isaac Lab. It runs in about 50 seconds per motion. The first milestone was to reproduce my drill pickup in physics.</p>
+  </div>
+  <div class="steps">
+
+    <article class="step" id="franka-2">
+      <div class="notes">
+        <p class="step-num">Step F2</p>
+        <h3>Grasp transfer: hand to gripper</h3>
+        <p>At the grasp frame, the kid's right hand sets the gripper's target. The gripper grasps where the hand touches the handle, approaches along the palm's direction, and closes its fingers across the handle.</p>
+        <dl class="facts">
+          <div><dt>Grasp frame</dt><dd>54 (lift starts at 64)</dd></div>
+          <div><dt>Handle width</dt><dd>5.5 cm (gripper opens 8 cm)</dd></div>
+          <div><dt>Palm faces grasp</dt><dd>cos 0.96</dd></div>
+          <div><dt>Palm clearance</dt><dd>grasp moved back 8.7 mm</dd></div>
+        </dl>
+        <p class="change"><b>What I learned:</b> GRAIL reconstructs the person with a body reshaped to G1 proportions. With a standard SMPL-X body, the hand landed 30 cm from the drill.</p>
+      </div>
+      <figure>
+        <video src="videos/franka-02.mp4" poster="posters/franka-02.jpg" width="1280" height="830" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Left: the kid's hand and where it touches the drill. Right: the gripper placed from it.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step" id="franka-3">
+      <div class="notes">
+        <p class="step-num">Step F3</p>
+        <h3>Mount the arm</h3>
+        <p>On the table, a Panda can't hold a level grasp only 15 cm above its base: its wrist joint runs out of range. Tilting the gripper down instead makes it hit the drill's motor housing. So the retargeting tries base positions and keeps one that passes every check.</p>
+        <dl class="facts">
+          <div><dt>Positions tried</dt><dd>30</dd></div>
+          <div><dt>Chosen</dt><dd>stand 35 cm below the table top, 50 cm from the grasp</dd></div>
+          <div><dt>Checks</dt><dd>reach within 2 mm and 1&deg;, joint speeds, 0.1 rad from joint limits, arm above the table</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <img src="images/franka-03-search.png" width="1280" height="720" alt="Grid of 30 base positions: every position on the table hits a joint limit or moves too fast; 20 cm below the table nothing can reach; 35 cm below the table only the 0.50 m distance passes.">
+        <figcaption>Every base position tried, and why each one failed. Green is the one chosen.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step" id="franka-4">
+      <div class="notes">
+        <p class="step-num">Step F4</p>
+        <h3>Planned motion</h3>
+        <p>The arm moves from its ready pose to a pre-grasp pose, approaches the handle in a straight 10 cm line, then follows the drill along its reconstructed path. IK is solved with pinocchio and pink. The clip shows the plan without physics.</p>
+        <dl class="facts">
+          <div><dt>IK accuracy</dt><dd>0.1 mm, 0.02&deg;</dd></div>
+          <div><dt>Fastest joint</dt><dd>0.96&times; its speed limit</dd></div>
+          <div><dt>Closest joint limit</dt><dd>0.13 rad away</dd></div>
+          <div><dt>Arm over the table</dt><dd>&ge; 12 cm above it</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <video src="videos/franka-04.mp4" poster="posters/franka-04.jpg" width="1280" height="830" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step" id="franka-5">
+      <div class="notes">
+        <p class="step-num">Step F5</p>
+        <h3>Contact settings</h3>
+        <p>With Isaac Lab's default contacts, nothing resists twisting, so the drill spins around the line between the two finger pads and slips out. Friction 1.0 and a 1 cm contact patch, typical of rubber pads, hold it.</p>
+        <dl class="facts">
+          <div><dt>Default contacts</dt><dd>rises 14.5 cm, then slips out</dd></div>
+          <div><dt>Tuned contacts</dt><dd>lifted 21.1 cm and held</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <video src="videos/franka-05.mp4" poster="posters/franka-05.jpg" width="1920" height="650" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step" id="franka-6">
+      <div class="notes">
+        <p class="step-num">Step F6</p>
+        <h3>Physics check</h3>
+        <p>Isaac Lab replays the plan with full physics. The arm follows the planned joint angles and speeds, the gripper closes at the grasp frame, and the 1 kg drill uses GRAIL's own collision model.</p>
+        <dl class="facts">
+          <div><dt>Lift</dt><dd>21.1 of 22.4 cm</dd></div>
+          <div><dt>Drill vs. its path</dt><dd>2.4 cm average, 2.8 cm worst</dd></div>
+          <div><dt>Gripper vs. plan</dt><dd>5.6 mm average</dd></div>
+          <div><dt>Before the grasp</dt><dd>drill moved 2.7 mm</dd></div>
+          <div><dt>Final 1 s hold</dt><dd>no drop</dd></div>
+        </dl>
+        <p class="change limit"><b>Known limit:</b> the drill tilts about 24&deg; in the fingers while they close. That causes most of the 2.4 cm offset.</p>
+      </div>
+      <figure>
+        <video src="videos/franka-06.mp4" poster="posters/franka-06.jpg" width="1280" height="830" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+    <article class="step wide" id="franka-7">
+      <div class="notes">
+        <p class="step-num">Comparison</p>
+        <h3>Same video, two robots</h3>
+        <p>The generated kid video, retargeted to GRAIL's G1 humanoid and to the Franka arm, both lifting the drill in physics simulation.</p>
+      </div>
+      <figure>
+        <video src="videos/franka-07.mp4" poster="posters/franka-07.jpg" width="2156" height="830" controls muted loop playsinline preload="none" data-autoplay></video>
+      </figure>
+    </article>
+
+  </div>
+</section>
+
+<section id="fixes" aria-labelledby="fixes-title">
+  <div class="section-head">
+    <p class="eyebrow">Along the way</p>
+    <h2 id="fixes-title">Problems I hit and fixed</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Where</th><th>Problem</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td class="scope">Step 1</td><td>Blender's OpenCV 5 has no OpenEXR, so depth images were silently missing.</td><td>Pinned OpenCV below 5.</td></tr>
+        <tr><td class="scope">Steps 2, 4</td><td>No paid OpenAI API key.</td><td>CLIProxyAPI with a ChatGPT Plus account; GRAIL's model names read from settings.</td></tr>
+        <tr><td class="scope">Step 2</td><td>No budget for Kling.</td><td>Wan 2.2 with a low-memory setup that fits a 24 GB GPU.</td></tr>
+        <tr><td class="scope">Step 2</td><td>Wan's default negative prompt discourages standing still, which rushed the pickup.</td><td>My own negative prompt and a slow-paced prompt.</td></tr>
+        <tr><td class="scope">Data</td><td>Downloading NVIDIA's released data hit Hugging Face's rate limit.</td><td>A downloader that lists only the folders I need.</td></tr>
+        <tr><td class="scope">Steps 6&ndash;7</td><td>The documented policy and training commands fail as written.</td><td>Corrected the headless flag and the training script path.</td></tr>
+        <tr><td class="scope">Step 5</td><td>Scenes with a built-in table record no table, so training fails.</td><td>Add the table from the drill's starting height.</td></tr>
+        <tr><td class="scope">Step 7</td><td>A table centered under the drill touched the G1's hand on frame 0.</td><td>Near edge placed 3 cm past the drill's base.</td></tr>
+        <tr><td class="scope">G1 videos</td><td>The render camera followed the robot's pelvis, so the table and floor appeared to shake.</td><td>Fixed camera; results unchanged.</td></tr>
+        <tr><td class="scope">G1 videos</td><td>448 of NVIDIA's 2,991 object models (water bottles, kettles, cups, cans and more) use a see-through material that Isaac Sim draws invisible. The kettle vanished from my video.</td><td>Render from copies with the see-through setting off; physics unchanged.</td></tr>
+        <tr><td class="scope">Franka</td><td>The first rendered frames were blurred, so each clip jumped when it looped.</td><td>30 warm-up frames before recording.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="next" aria-labelledby="next-title">
+  <div class="section-head">
+    <p class="eyebrow">Next</p>
+    <h2 id="next-title">What comes next</h2>
+  </div>
+  <ul class="next">
+    <li><b>GPU access for training.</b> GRAIL's policy training expects 8 GPUs; I have one RTX 3090.</li>
+    <li><b>Imitation learning or reinforcement learning</b> for the Franka, to decide with my mentor.</li>
+    <li><b>Many motions, not one.</b> Run the Franka pipeline on NVIDIA's 2,991 released tabletop pickups. Their reconstructions are a separate download, and new objects will bring new edge cases.</li>
+    <li><b>Steadier grasp.</b> Remove the 24&deg; tilt of the drill while the fingers close.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Local copies of every clip, with READMEs and an interactive 3D view of the reconstruction: <code>~/Desktop/Xuanyu/GRAIL_progress_videos/</code> and <code>~/Desktop/Xuanyu/Franka_progress_videos/</code>.</p>
+  <p>Franka code: <code>grail/franka/</code> (retarget.py, physics_check.py, visualize_grasp.py, scripts/retarget_and_check.sh). Setup: Docker image nvgrail/grail:1.1.1, Isaac Sim 5.1 with Isaac Lab 0.54.2, one RTX 3090 (24 GB).</p>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var videos = document.querySelectorAll("video[data-autoplay]");
+  if (reduce || !("IntersectionObserver" in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      var v = e.target;
+      if (e.isIntersecting && e.intersectionRatio >= 0.5) {
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
+      } else if (!v.paused) {
+        v.pause();
+      }
+    });
+  }, { threshold: [0, 0.5] });
+  videos.forEach(function (v) { io.observe(v); });
+})();
+</script>
+</body>
+</html>
