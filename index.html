@@ -230,6 +230,10 @@ th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.9rem; border-b
 tr:last-child td { border-bottom: 0; }
 th { font-family: var(--mono); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 td.scope { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+td.count { font-family: var(--mono); font-size: 0.86rem; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+td.count.hit { color: var(--ok); font-weight: 500; }
+table.results tbody tr:nth-child(-n+9) td:first-child { font-weight: 600; }
+tfoot td { font-weight: 600; border-top: 1px solid var(--line); border-bottom: 0; }
 .next { display: grid; gap: 0.9rem; margin: 0; padding: 0; list-style: none; max-width: 72ch; }
 .next li { padding-left: 1.25rem; position: relative; }
 .next li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 0.5rem; height: 0.5rem; border: 2px solid var(--amber); border-radius: 50%; }
@@ -250,9 +254,9 @@ footer p { max-width: 80ch; }
 <div class="page">
 
 <header class="masthead">
-  <p class="eyebrow">Research progress &middot; 21&ndash;22 Oct 2026 &middot; one RTX 3090</p>
+  <p class="eyebrow">Research progress &middot; 21&ndash;30 Oct 2026 &middot; one RTX 3090</p>
   <h1>GRAIL to Franka</h1>
-  <p class="lede">I ran NVIDIA's GRAIL pipeline end to end on a video I generated myself: a kid picking up a cordless drill, turned into motion for the Unitree G1 humanoid. Then I replaced the G1 with a Franka Panda arm and its two-finger gripper, and checked the result in physics simulation. Every step below has the video it produced.</p>
+  <p class="lede">I ran NVIDIA's GRAIL pipeline end to end on a video I generated myself: a kid picking up a cordless drill, turned into motion for the Unitree G1 humanoid. Then I replaced the G1 with a Franka Panda arm and its two-finger gripper, and checked the result in physics simulation. This week I worked out where to mount the arm and tested it on 14 of NVIDIA's released pickups. Every step below has the video or chart it produced.</p>
   <dl class="status">
     <div>
       <dt>GRAIL on my own video</dt>
@@ -263,6 +267,11 @@ footer p { max-width: 80ch; }
       <dt>Franka Panda retargeting</dt>
       <dd class="pill-row"><span class="pill ok">Done for one motion</span></dd>
       <dd>The kid's grasp moved onto the Franka gripper and verified in Isaac Lab: the drill is lifted 21 of 22 cm and held.</dd>
+    </div>
+    <div>
+      <dt>Arm placement, many objects</dt>
+      <dd class="pill-row"><span class="pill ok">9 of 14 objects</span></dd>
+      <dd>One mount on the table picks up 9 of the 14 released objects that fit the gripper, checked in physics.</dd>
     </div>
     <div>
       <dt>Policy training</dt>
@@ -358,7 +367,17 @@ footer p { max-width: 80ch; }
       <li><a class="chip" href="#franka-6"><span class="n">F6</span>Physics check</a></li>
     </ul>
   </div>
-  <p class="map-note">Steps 1&ndash;4 produce a 4D reconstruction of the person and the object, which does not depend on the robot. GRAIL turns it into G1 motion (steps 5&ndash;7); my new code turns the same reconstruction into Franka motion (F2&ndash;F6).</p>
+  <div class="lane franka">
+    <p class="lane-label"><b>Arm placement</b>this week</p>
+    <ul class="chips">
+      <li><a class="chip" href="#place-7"><span class="n">F7</span>Mount sweep</a></li>
+      <li><a class="chip" href="#place-8"><span class="n">F8</span>Safer approach</a></li>
+      <li><a class="chip" href="#place-9"><span class="n">F9</span>Released pickups</a></li>
+      <li><a class="chip" href="#place-10"><span class="n">F10</span>Grasp and lift</a></li>
+      <li><a class="chip" href="#place-11"><span class="n">F11</span>Better grasps</a></li>
+    </ul>
+  </div>
+  <p class="map-note">Steps 1&ndash;4 produce a 4D reconstruction of the person and the object, which does not depend on the robot. GRAIL turns it into G1 motion (steps 5&ndash;7); my new code turns the same reconstruction into Franka motion (F2&ndash;F6) and finds where to mount the arm (F7&ndash;F11).</p>
 </nav>
 
 <section id="overview" aria-labelledby="overview-title">
@@ -615,6 +634,166 @@ footer p { max-width: 80ch; }
   </div>
 </section>
 
+<section id="placement" aria-labelledby="placement-title">
+  <div class="section-head">
+    <p class="eyebrow">Pipeline 2, this week</p>
+    <h2 id="placement-title">Where to mount the arm</h2>
+    <p>My mentor asked me to fix the arm's position. I started with the free option: keep the human videos and find one fixed mount that works. I tested it first on my drill, then on 14 of NVIDIA's released tabletop pickups. Every result below is from the Isaac Lab physics check.</p>
+  </div>
+  <div class="steps">
+
+    <article class="step wide" id="place-7">
+      <div class="notes">
+        <p class="step-num">Step F7</p>
+        <h3>Mount sweep for the drill</h3>
+        <p>I tried 210 fixed mounts around the drill: 7 angles, 6 distances and 5 heights. For each one the arm is planned and then replayed with physics. Angles are measured around the drill; 0&deg; is straight behind the direction the kid's hand came from.</p>
+        <dl class="facts">
+          <div><dt>Mounts tried</dt><dd>210 (&minus;90&deg; to 90&deg;, 0.3&ndash;0.8 m away, 0&ndash;0.65 m below the table top)</dd></div>
+          <div><dt>First try</dt><dd>19 succeed, 1 on the table</dd></div>
+          <div><dt>After F8</dt><dd>29 succeed, 9 on the table</dd></div>
+          <div><dt>Best side</dt><dd>&minus;30&deg; to &minus;60&deg;, 0.5&ndash;0.8 m away</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <img src="GRAIL_Franka/images/franka-08-mounts.png" width="2427" height="532" alt="Five half-circle charts, one per mount height, with the drill at the center. Green successes cluster on the left side, between minus 30 and minus 60 degrees: 9 on the table, 7 at 0.2 m below, 8 at 0.35 m below, 5 at 0.5 m below and none at 0.65 m below.">
+        <figcaption>Every mount tried for the drill, after the F8 fixes. Rings are 0.3, 0.5 and 0.7 m from the drill.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="place-8">
+      <div class="notes">
+        <p class="step-num">Step F8</p>
+        <h3>A safer approach</h3>
+        <p>The first sweep showed three problems. The human moves faster than the Panda's joints allow. On the table, the wrist swung through the drill on its way to the grasp and knocked it over. And people often slide an object a few centimeters before lifting it, so the gripper closed where the object had already left.</p>
+        <dl class="facts">
+          <div><dt>Approach</dt><dd>hover 15 cm above the grasp, then straight down and in</dd></div>
+          <div><dt>Collision check</dt><dd>arm against the object's mesh on every frame before the grasp</dd></div>
+          <div><dt>Speed</dt><dd>human motion played 2&times; slower</dd></div>
+          <div><dt>Grasp timing</dt><dd>close before the object first moves, not before it lifts</dd></div>
+          <div><dt>Low objects</dt><dd>grasp from straight above when the palm would hit the table</dd></div>
+        </dl>
+        <p class="change"><b>What I learned:</b> before the collision check, the wrist pushed the drill 7.8 cm before the gripper even closed.</p>
+      </div>
+    </article>
+
+    <article class="step wide" id="place-9">
+      <div class="notes">
+        <p class="step-num">Step F9</p>
+        <h3>NVIDIA's released pickups</h3>
+        <p>I downloaded 20 of NVIDIA's reconstructed tabletop pickups and turned them into Franka inputs. Each one was tested at the 5 most promising mounts from the drill sweep. Copying the person's whole motion worked for only 3 objects. The arm always failed while holding the object: after lifting, people carry objects far and turn them a lot, and a fixed arm cannot follow.</p>
+        <dl class="facts">
+          <div><dt>Motions</dt><dd>20; 5 objects too wide for the 8 cm gripper where the person held them, 1 picked up left-handed</dd></div>
+          <div><dt>Tested</dt><dd>14 objects &times; 5 mounts</dd></div>
+          <div><dt>Copy the full motion</dt><dd>3 of 14 objects</dd></div>
+          <div><dt>Human motion after lifting</dt><dd>raised 21&ndash;78 cm, turned up to 179&deg; (rolling pin)</dd></div>
+        </dl>
+      </div>
+    </article>
+
+    <article class="step wide" id="place-10">
+      <div class="notes">
+        <p class="step-num">Step F10</p>
+        <h3>Grasp and lift</h3>
+        <p>For a pickup task the robot only has to grasp the object and lift it. So the Franka now copies where and when the person grasped, then lifts the object 20 cm straight up over 2 seconds and holds it still. The joint-speed failures went from 36 to 7, and 5 of the 14 objects succeed.</p>
+        <p class="change limit"><b>Still open:</b> the remaining objects mostly slip out of the fingers. This option (A) and two others are for my mentor to decide: follow the person's path with looser rotation (B), or keep copying everything and use only slow, small human motions (C).</p>
+      </div>
+    </article>
+
+    <article class="step wide" id="place-11">
+      <div class="notes">
+        <p class="step-num">Step F11</p>
+        <h3>Grasps near the center of mass</h3>
+        <p>Every released object weighs 1 kg in simulation. Held far from its center of mass, an object swings around the line between the two finger pads and slips out. The planner now measures that lever and prefers grasps within 3 cm of the center of mass. It also adds a grasp from straight above through the center of mass.</p>
+        <dl class="facts">
+          <div><dt>Objects picked up</dt><dd>9 of 14</dd></div>
+          <div><dt>Best mount</dt><dd>on the table, &minus;30&deg;, 0.7 m: works for all 9</dd></div>
+          <div><dt>Other mounts</dt><dd>on the table at &minus;60&deg;: 7 &middot; 0.2 m below: 6 &middot; the two 0.35 m below: 3 each</dd></div>
+          <div><dt>Lift in the clip</dt><dd>banana 19.3, cereal 18.9, rolling pin 19.2 of 20 cm</dd></div>
+        </dl>
+        <p class="change"><b>What I learned:</b> the cereal box mesh has only 8 corner points, so the planner saw nothing in the middle of its faces. It now also uses 20,000 points sampled over each surface. I also tried a constant 70 N squeeze like the real gripper, but it popped round objects out of the fingers, so I kept Isaac Lab's finger control.</p>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-09.mp4" poster="GRAIL_Franka/posters/franka-09.jpg" width="2880" height="540" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>The three objects this step rescued, at the best mount: banana, cereal box and rolling pin, each grasped through its center of mass and lifted 20 cm.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="place-results">
+      <div class="notes">
+        <p class="step-num">Results</p>
+        <h3>14 objects, 5 mounts each</h3>
+        <p>Number of mounts, out of 5, where the Franka lifts the object in physics.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="results">
+          <thead><tr><th>Object</th><th>Copy full motion</th><th>Grasp and lift (F10)</th><th>Center-of-mass grasps (F11)</th><th>Notes</th></tr></thead>
+          <tbody>
+        <tr><td>milk</td><td class="count hit">5 / 5</td><td class="count hit">5 / 5</td><td class="count hit">5 / 5</td><td>works at every mount</td></tr>
+        <tr><td>spray bottle</td><td class="count">0 / 5</td><td class="count hit">5 / 5</td><td class="count hit">5 / 5</td><td></td></tr>
+        <tr><td>wine bottle</td><td class="count hit">4 / 5</td><td class="count hit">4 / 5</td><td class="count hit">4 / 5</td><td></td></tr>
+        <tr><td>banana</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count hit">3 / 5</td><td>grasped at its center of mass</td></tr>
+        <tr><td>cereal box</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count hit">3 / 5</td><td>grasped at its center of mass</td></tr>
+        <tr><td>rolling pin</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count hit">3 / 5</td><td>grasped at its center of mass</td></tr>
+        <tr><td>ketchup</td><td class="count hit">2 / 5</td><td class="count hit">2 / 5</td><td class="count hit">2 / 5</td><td>slips at the lower mounts</td></tr>
+        <tr><td>water bottle</td><td class="count">0 / 5</td><td class="count hit">1 / 5</td><td class="count hit">2 / 5</td><td>needs 7&ndash;8 cm of the 8 cm opening</td></tr>
+        <tr><td>teapot</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count hit">1 / 5</td><td>handle is 4.4 cm off the center of mass</td></tr>
+        <tr><td>kettle</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td>handle slips: rises 15&ndash;16 of 20 cm</td></tr>
+        <tr><td>pan</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td>no grasp the open gripper fits without hitting the pan or table</td></tr>
+        <tr><td>canned food</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td>no grasp the open gripper fits without hitting the can or table</td></tr>
+        <tr><td>bowl</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td>too wide for the gripper</td></tr>
+        <tr><td>coffee cup</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td class="count">0 / 5</td><td>too wide for the gripper</td></tr>
+          </tbody>
+          <tfoot><tr><td>Objects picked up</td><td class="count">3 of 14</td><td class="count">5 of 14</td><td class="count hit">9 of 14</td><td></td></tr></tfoot>
+        </table>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section id="research" aria-labelledby="research-title">
+  <div class="section-head">
+    <p class="eyebrow">Also this week</p>
+    <h2 id="research-title">What I looked into</h2>
+  </div>
+  <div class="steps">
+
+    <article class="step wide">
+      <div class="notes">
+        <h3>How GRAIL handles the object</h3>
+        <p>GRAIL never rebuilds the object from the video. It starts from a known 3D model, places it in the Blender scene, and hands the same model to FoundationPose. FoundationPose starts from the pose Blender used and only tracks the object from frame to frame. So a better object model has to come from the asset step, not from the video.</p>
+        <dl class="facts">
+          <div><dt>Object model</dt><dd>ComAsset or RoboCasa, or text &rarr; image &rarr; Hunyuan3D-2.1</dd></div>
+          <div><dt>Order</dt><dd>body and hands &rarr; masks and depth &rarr; FoundationPose &rarr; joint optimization &rarr; filters</dd></div>
+          <div><dt>FoundationPose</dt><dd>given the mesh and Blender's starting pose; tracking only</dd></div>
+        </dl>
+      </div>
+    </article>
+
+    <article class="step wide">
+      <div class="notes">
+        <h3>Other ways to fix the arm's position</h3>
+        <p>Prompting a Franka straight into the generated video needs a video model trained on robot footage, such as DROID or Cosmos. There is little such data, and the generated arm is hard to match to a real Franka, so I started with the free option above. For trying other video models, I priced the main ones.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Model</th><th>Price</th><th>One 5 s clip</th><th>100 clips</th></tr></thead>
+          <tbody>
+            <tr><td>Kling 2.5 Turbo Pro</td><td class="scope">$0.07 / s</td><td class="scope">$0.35</td><td class="scope">$35</td></tr>
+            <tr><td>Kling 3.0 Pro</td><td class="scope">$0.112 / s</td><td class="scope">$0.56</td><td class="scope">$56</td></tr>
+            <tr><td>Veo 3.1 Lite / Fast / Standard (8 s max)</td><td class="scope">$0.05 / $0.10 / $0.40 per s</td><td class="scope">$0.25 / $0.50 / $2.00</td><td class="scope">$25 / $50 / $200</td></tr>
+            <tr><td>Wan 2.6, 720p</td><td class="scope">$0.10 / s</td><td class="scope">$0.50</td><td class="scope">$50</td></tr>
+            <tr><td>Hailuo-H3</td><td class="scope">$0.13 / s</td><td class="scope">$0.65</td><td class="scope">$65</td></tr>
+            <tr><td>Seedance 2.0, 720p (priced by tokens: width &times; height &times; fps &times; seconds / 1024, at $7 per million)</td><td class="scope">108k tokens per 5 s</td><td class="scope">$0.76</td><td class="scope">$76</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="map-note">Prices checked in October 2026. Sora 2's API shut down on 24 Sep 2026. Wan 2.2 on my own GPU stays free, at about 18 minutes per clip.</p>
+    </article>
+
+  </div>
+</section>
+
 <section id="fixes" aria-labelledby="fixes-title">
   <div class="section-head">
     <p class="eyebrow">Along the way</p>
@@ -635,6 +814,11 @@ footer p { max-width: 80ch; }
         <tr><td class="scope">G1 videos</td><td>The render camera followed the robot's pelvis, so the table and floor appeared to shake.</td><td>Fixed camera; results unchanged.</td></tr>
         <tr><td class="scope">G1 videos</td><td>448 of NVIDIA's 2,991 object models (water bottles, kettles, cups, cans and more) use a see-through material that Isaac Sim draws invisible. The kettle vanished from my video.</td><td>Render from copies with the see-through setting off; physics unchanged.</td></tr>
         <tr><td class="scope">Franka</td><td>The first rendered frames were blurred, so each clip jumped when it looped.</td><td>30 warm-up frames before recording.</td></tr>
+        <tr><td class="scope">F8</td><td>On the table, the wrist knocked the drill over before the grasp: the move to the pre-grasp pose was never collision-checked.</td><td>Hover above the grasp first, and check the arm against the object on every frame before the grasp.</td></tr>
+        <tr><td class="scope">F8</td><td>People slide objects 5&ndash;13 cm before lifting them, so the gripper closed on air.</td><td>Close the gripper before the object first moves.</td></tr>
+        <tr><td class="scope">F8</td><td>On low, flat objects the wide palm dipped into the table.</td><td>A grasp from straight above as a fallback.</td></tr>
+        <tr><td class="scope">F11</td><td>Low-poly meshes (the cereal box has 8 corner points) left the grasp planner nothing to measure mid-face.</td><td>Plan grasps on 20,000 points sampled over the surface.</td></tr>
+        <tr><td class="scope">Results</td><td>Outputs written inside Docker are owned by root, so a rerun could silently keep old results.</td><td>Write every rerun to a new folder.</td></tr>
       </tbody>
     </table>
   </div>
@@ -648,14 +832,19 @@ footer p { max-width: 80ch; }
   <ul class="next">
     <li><b>GPU access for training.</b> GRAIL's policy training expects 8 GPUs; I have one RTX 3090.</li>
     <li><b>Imitation learning or reinforcement learning</b> for the Franka, to decide with my mentor.</li>
-    <li><b>Many motions, not one.</b> Run the Franka pipeline on NVIDIA's 2,991 released tabletop pickups. Their reconstructions are a separate download, and new objects will bring new edge cases.</li>
+    <li><b>What the arm copies from the person</b>, to decide with my mentor: grasp and lift (A, done), the person's path with looser rotation (B), or the full motion on slow, small human motions only (C).</li>
+    <li><b>Grasps that differ from the person's.</b> For three objects the Franka grasps the center of mass, not where the person held it. Is that fine for training data?</li>
+    <li><b>Object weights.</b> Every released object weighs 1 kg in simulation, even the banana. Real weights would make many grasps easier.</li>
+    <li><b>More of the released pickups.</b> 20 of NVIDIA's 2,991 so far, at the &minus;30&deg;, 0.7 m table mount.</li>
+    <li><b>The objects that still fail:</b> kettle and teapot handles, the pan, canned food, and objects wider than the 8 cm gripper.</li>
+    <li><b>A small paid video-model test,</b> about $40 across four models, if my mentor approves.</li>
     <li><b>Steadier grasp.</b> Remove the 24&deg; tilt of the drill while the fingers close.</li>
   </ul>
 </section>
 
 <footer>
   <p>Local copies of every clip, with READMEs and an interactive 3D view of the reconstruction: <code>~/Desktop/Xuanyu/GRAIL_progress_videos/</code> and <code>~/Desktop/Xuanyu/Franka_progress_videos/</code>.</p>
-  <p>Franka code: <code>grail/franka/</code> (retarget.py, physics_check.py, visualize_grasp.py, scripts/retarget_and_check.sh). Setup: Docker image nvgrail/grail:1.1.1, Isaac Sim 5.1 with Isaac Lab 0.54.2, one RTX 3090 (24 GB).</p>
+  <p>Franka code: <code>grail/franka/</code> (retarget.py, physics_check.py, visualize_grasp.py, scripts/retarget_and_check.sh, scripts/sweep_base.py, scripts/prepare_released.py). Setup: Docker image nvgrail/grail:1.1.1, Isaac Sim 5.1 with Isaac Lab 0.54.2, one RTX 3090 (24 GB).</p>
 </footer>
 
 </div>
