@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>Week 3 · GRAIL to Franka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a lab report. A pipeline map up top, then each pipeline step as a row of notes beside its clip; wide clips span the column. */
+:root {
+  --bg: #f2f5f6;
+  --surface: #ffffff;
+  --ink: #152027;
+  --muted: #55636c;
+  --line: #d5dde1;
+  --amber: #9f600a;        /* the drill's yellow band, darkened to read on light */
+  --amber-soft: #f5e6cb;
+  --steel: #255b80;        /* links and the Franka branch */
+  --steel-soft: #dde9f2;
+  --ok: #217449;
+  --ok-soft: #dbeee3;
+  --todo: #6b5a1e;
+  --todo-soft: #efe8cf;
+  --screen: #1c1c1c;       /* behind video letterboxing */
+  --paper: #ffffff;        /* the search chart is drawn on white in both themes */
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1316; --surface: #151c20; --ink: #e3e9ec; --muted: #97a4ac; --line: #28333a;
+    --amber: #ebab40; --amber-soft: #3a2c13; --steel: #8dbbdb; --steel-soft: #182b38;
+    --ok: #5cc58b; --ok-soft: #15301f; --todo: #dcc46e; --todo-soft: #312a12; --screen: #000000;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1316; --surface: #151c20; --ink: #e3e9ec; --muted: #97a4ac; --line: #28333a;
+  --amber: #ebab40; --amber-soft: #3a2c13; --steel: #8dbbdb; --steel-soft: #182b38;
+  --ok: #5cc58b; --ok-soft: #15301f; --todo: #dcc46e; --todo-soft: #312a12; --screen: #000000;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1rem/1.6 var(--body);
+}
+.page {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding-block: 2.5rem 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 4rem;
+}
+a { color: var(--steel); text-underline-offset: 0.18em; }
+a:focus-visible, video:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.05; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.6rem, 6vw, 4.2rem); letter-spacing: 0.005em; }
+h2 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); }
+h3 { font-size: 1.65rem; font-weight: 600; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* Masthead */
+.masthead { display: grid; gap: 1.25rem; }
+.lede { max-width: 66ch; font-size: 1.12rem; color: var(--ink); }
+.status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 0.5rem 0 0;
+}
+.status div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+}
+.status dt { font-weight: 600; }
+.status dd { margin: 0; color: var(--muted); font-size: 0.93rem; }
+.status dd.pill-row { display: flex; }
+.pill {
+  justify-self: start;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.todo { background: var(--todo-soft); color: var(--todo); }
+
+/* Pipeline map */
+.map { display: grid; gap: 1rem; }
+.lane {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+.lane-label { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); padding-top: 0.45rem; }
+.lane-label b { display: block; font-family: var(--body); font-size: 0.95rem; color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem 1.6rem; list-style: none; margin: 0; padding: 0; }
+.chips li { position: relative; }
+.chips li + li::before {
+  content: "\2192";
+  position: absolute;
+  left: -1.25rem;
+  top: 0.38rem;
+  color: var(--muted);
+}
+.chip {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.93rem;
+}
+.chip:hover { border-color: var(--muted); }
+.chip .n { font-family: var(--mono); font-size: 0.78rem; color: var(--amber); }
+.lane.g1 .chip { border-left: 3px solid var(--ink); }
+.lane.franka .chip { border-left: 3px solid var(--steel); }
+.lane.shared .chip { border-left: 3px solid var(--amber); }
+.map-note { font-size: 0.9rem; color: var(--muted); max-width: 70ch; }
+
+/* Sections and steps */
+section { display: grid; gap: 2rem; }
+.section-head { display: grid; gap: 0.6rem; max-width: 70ch; }
+.section-head p { color: var(--muted); }
+.steps { display: grid; gap: 3rem; }
+.step {
+  display: grid;
+  grid-template-columns: minmax(0, 21rem) minmax(0, 1fr);
+  gap: 1.25rem 2.5rem;
+  align-items: start;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--line);
+}
+.step.wide { grid-template-columns: minmax(0, 1fr); }
+.step.wide .notes { max-width: 70ch; }
+.notes { display: grid; gap: 0.85rem; min-width: 0; }
+.step-num { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); letter-spacing: 0.04em; }
+.notes p { color: var(--ink); }
+.facts { display: grid; gap: 0.35rem; margin: 0; }
+.facts div {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding-block: 0.3rem;
+  border-bottom: 1px dashed var(--line);
+  font-size: 0.92rem;
+}
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; font-family: var(--mono); font-size: 0.86rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.change {
+  font-size: 0.93rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 4px;
+  background: var(--amber-soft);
+}
+.change.limit { background: var(--steel-soft); }
+.change b { font-weight: 600; }
+figure { margin: 0; display: grid; gap: 0.5rem; min-width: 0; }
+figure video, figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: min(78vh, 46rem);
+  object-fit: contain;
+  background: var(--screen);
+  border-radius: 4px;
+}
+figure img { background: var(--paper); }
+figcaption { font-size: 0.85rem; color: var(--muted); }
+
+/* The two robots */
+.robots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1.5rem;
+}
+.robot {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+.robot img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; }
+.robot-body { display: grid; gap: 0.8rem; align-content: start; padding: 1.25rem 1.25rem 1.5rem; }
+.robot .facts div { grid-template-columns: 7.5rem minmax(0, 1fr); }
+.overview { display: grid; gap: 2rem; }
+
+/* Fixes table and next steps */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--mono); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td.scope { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+td.count { font-family: var(--mono); font-size: 0.86rem; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+td.count.hit { color: var(--ok); font-weight: 500; }
+td.hit { color: var(--ok); font-weight: 500; }
+table.results tbody tr:nth-child(-n+9) td:first-child { font-weight: 600; }
+tfoot td { font-weight: 600; border-top: 1px solid var(--line); border-bottom: 0; }
+table.answers td:first-child { width: 2.5rem; }
+table.answers td:last-child { width: 38%; }
+.next { display: grid; gap: 0.9rem; margin: 0; padding: 0; list-style: none; max-width: 72ch; }
+.next li { padding-left: 1.25rem; position: relative; }
+.next li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 0.5rem; height: 0.5rem; border: 2px solid var(--amber); border-radius: 50%; }
+footer { display: grid; gap: 0.6rem; font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 1.5rem; }
+footer p { max-width: 80ch; }
+
+@media (max-width: 860px) {
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .lane { grid-template-columns: minmax(0, 1fr); }
+  .lane-label { padding-top: 0; }
+}
+@media (max-width: 480px) {
+  .facts div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+}
+
+/* Week navigation, week cards and pager */
+.weeknav { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; font-family: var(--mono); font-size: 0.85rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--line); }
+.weeknav a { color: var(--muted); text-decoration: none; padding-bottom: 0.2rem; }
+.weeknav a:hover { color: var(--ink); }
+.weeknav a[aria-current="page"] { color: var(--ink); font-weight: 500; border-bottom: 2px solid var(--amber); }
+.weeks { display: grid; gap: 1rem; }
+.week { display: grid; gap: 0.6rem; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1.25rem 1.35rem; }
+.week h3 a { color: inherit; text-decoration: none; }
+.week h3 a:hover { text-decoration: underline; }
+.week p { max-width: 72ch; }
+.week .more { font-weight: 500; }
+.pager { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.75rem 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 0.88rem; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <nav class="weeknav" aria-label="Weeks">
+    <a href="index.html">Overview</a>
+    <a href="week1.html">Week 1</a>
+    <a href="week2.html">Week 2</a>
+    <a href="week3.html" aria-current="page">Week 3</a>
+  </nav>
+  <p class="eyebrow">Week 3 &middot; 19&ndash;20 Nov 2026 &middot; in progress</p>
+  <h1>What the video model can do for the Franka</h1>
+  <p class="lede">My mentor asked five questions about what the video model really gives (F12&ndash;F16). I fixed the scene, had Wan draw the Franka, read the video back into joint angles, and copied the kid's hand onto the Franka. Then I tried more motions (F17&ndash;F20). Copying the hand mostly fails because of the robot's body, so the Franka now copies what the drill does, with its own grasp: lift and place work. The last test is still running.</p>
+</header>
+
+<section id="video-tests" aria-labelledby="video-tests-title">
+  <div class="section-head">
+    <p class="eyebrow">Pipeline 2, week 3</p>
+    <h2 id="video-tests-title">My mentor's five questions</h2>
+    <p>My mentor asked me to stop designing the Franka's motion myself (a grasp from above, then a straight lift) and to test what the video model really gives. There were two tests: copy the video's motion onto the Franka, and have the video model draw the Franka picking up the drill itself. To rule out reconstruction errors, everything happens in one scene where every number is known, and every motion is checked in Isaac Lab physics.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="answers">
+      <thead><tr><th>#</th><th>Question</th><th>What I did</th><th>Answer</th></tr></thead>
+      <tbody>
+        <tr><td class="scope">1</td><td>Copy the video's motion onto the Franka, instead of grasping from above.</td><td>The gripper follows the kid's hand, then the drill (F16).</td><td>Every frame is reachable, but only 3&times; slower. Copied exactly, the Franka loses the drill. With 2 small fixes it lifts the drill 22.3 of 22.5 cm, just short of a pass.</td></tr>
+        <tr><td class="scope">2</td><td>How good is video generation really? Generate a Franka picking something up.</td><td>6 Wan 2.2 videos of the Franka, read back as joint angles and replayed in physics (F13&ndash;F15).</td><td>None works. Either a new limb grows out of the arm, or the drill moves while the gripper is still 9 cm away. The best video lifts the drill 0 cm in physics.</td></tr>
+        <tr><td class="scope">3</td><td>Tell the video model how tall the person is and how far from the table they stand.</td><td>Measured both, in the scene and in GRAIL's reconstruction (F12).</td><td>The video model gets both from the first frame: the kid is 1.35 m tall and stands 15 cm behind the table. GRAIL's reconstruction then resizes every person to the G1's 1.32 m.</td></tr>
+        <tr><td class="scope">4</td><td>Start from a scene with fixed numbers (image to video).</td><td>GRAIL's drill scene, rendered again with every number written down (F12).</td><td>Done. The new render matches GRAIL's pixel for pixel, and the Franka scenes use the same numbers.</td></tr>
+        <tr><td class="scope">5</td><td>Humans do many things robots can't. What does the video model understand about actions?</td><td>Questions 1 and 2 together.</td><td>Wan understands &ldquo;the drill ends up in the gripper&rdquo;, not &ldquo;the gripper has to hold the drill&rdquo;. The kid moves 3&times; faster than the Franka can, and holds the drill where two fingers can't.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="steps">
+
+    <article class="step wide" id="video-12">
+      <div class="notes">
+        <p class="step-num">Step F12</p>
+        <h3>A scene with known numbers</h3>
+        <p>I render GRAIL's drill scene again from its saved settings, so the table, the drill, the camera and the person are known exactly. For the Franka versions I hide the person and put the arm where the person stood, on a stand that brings its base level with the table top, turned toward the drill. The first frame is all the video model gets: it is how the model is &ldquo;told&rdquo; the person's height and distance.</p>
+        <dl class="facts">
+          <div><dt>Scene</dt><dd>kid_indoor2-manipulation_rand00001, the same as step 1</dd></div>
+          <div><dt>Table</dt><dd>top 0.80 m above the floor</dd></div>
+          <div><dt>Person</dt><dd>1.35 m tall, 0.15 m behind the table edge</dd></div>
+          <div><dt>Franka</dt><dd>where the person stood, base level with the table top</dd></div>
+          <div><dt>Check</dt><dd>new render identical to GRAIL's, pixel for pixel</dd></div>
+        </dl>
+        <p class="change"><b>What I learned:</b> compared with the known numbers, GRAIL's reconstruction puts the drill 1.3 cm too high and the person 6.4 cm too far back. It also resizes every person to the G1's proportions, 1.32 m tall; the body tracker's own estimate for this kid was 1.80 m. The heights only agree here because the kid is about the G1's size.</p>
+      </div>
+      <figure>
+        <img src="GRAIL_Franka/images/franka-12-scene.jpg" width="1458" height="864" alt="Three first frames of the same room and table with the drill on it: the kid standing behind the table; the Franka on a stand where the kid stood, gripper up in its ready pose; the Franka with its gripper lowered and pointing toward the drill.">
+        <figcaption>The three first frames. Left: GRAIL's scene. Middle: the Franka where the kid stood, the start of round 1. Right: the gripper raised beside the drill, the start of round 2.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="video-13">
+      <div class="notes">
+        <p class="step-num">Step F13</p>
+        <h3>Round 1: Wan draws the Franka</h3>
+        <p>Wan 2.2 animates the Franka frame with a prompt asking the arm to pick up the drill, and a negative prompt against people, bending parts and floating objects. In all three videos the real gripper stays still, and a new limb grows out of the arm and reaches for the drill. Two of them lift the drill a few centimeters with it.</p>
+        <dl class="facts">
+          <div><dt>Videos</dt><dd>3 seeds, 121 frames each, &asymp; 20 min each</dd></div>
+          <div><dt>Fit score</dt><dd>0.73, 0.69, 0.68: how well the closest real Franka covers the robot in the video (a real Franka video scores 0.92, F15)</dd></div>
+          <div><dt>Drill lifted</dt><dd>about 6 cm by the new limb, seeds 43 and 44</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-13.mp4" poster="GRAIL_Franka/posters/franka-13.jpg" width="1458" height="864" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Round 1, three seeds. The real gripper stays up top; each new limb grows from the elbow.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="video-14">
+      <div class="notes">
+        <p class="step-num">Step F14</p>
+        <h3>Round 2: a stricter prompt</h3>
+        <p>The first frame now has the gripper raised beside the drill, so less has to move. The prompt says the arm is one rigid robot that never grows new parts, lowers its gripper onto the drill and lifts it about 15 cm. The negative prompt adds extra arms, splitting parts, and hand-shaped or many-fingered grippers. The arm now stays a Franka, but in every video the drill starts to move while the gripper is still about 10 cm away.</p>
+        <dl class="facts">
+          <div><dt>Fit score</dt><dd>0.91, 0.92, 0.89</dd></div>
+          <div><dt>Closest gap first</dt><dd>9.7, 9.6, 9.4 cm between the gripper and the drill before the drill moves</dd></div>
+          <div><dt>Drill rises</dt><dd>about 52, 22 and 34 cm</dd></div>
+        </dl>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-14.mp4" poster="GRAIL_Franka/posters/franka-14.jpg" width="1458" height="864" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Round 2, three seeds. Seed 43 looks right at a glance; the gap shows up when the joints are read back (F15).</figcaption>
+      </figure>
+    </article>
+
+    <article class="step" id="video-15">
+      <div class="notes">
+        <p class="step-num">Step F15</p>
+        <h3>From video to joints to physics</h3>
+        <p>To test a generated video in physics, I need the Franka's joint angles from it. SAM2 tracks the robot and the drill, starting from their exact outlines in the known first frame. In every frame I fit the 7 joint angles so that a rendered Franka covers the robot in the video. Isaac Lab then replays the joint path, with the gripper closing just before the drill starts to move in the video.</p>
+        <p>To check the method, I planned a pickup myself, rendered it in the same scene and ran the same steps on that video.</p>
+        <dl class="facts">
+          <div><dt>Planned pickup</dt><dd>lifts 13.8 of 15 cm in physics</dd></div>
+          <div><dt>Read from its video</dt><dd>gripper 2.8 cm from the true path on average; lifts 13.1 of 15.1 cm, a pass</dd></div>
+          <div><dt>Best Wan video</dt><dd>round 2, seed 43: the gripper closes 10 cm from the drill; lift 0 cm</dd></div>
+        </dl>
+        <p class="change limit"><b>Known limit:</b> one camera sees depth poorly. In a test with known joints, the fitted gripper was within 2 cm at the grasp and the lift, but up to 16 cm off mid-reach.</p>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-15.mp4" poster="GRAIL_Franka/posters/franka-15.jpg" width="1080" height="1280" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Top: the best Wan video, the Franka fitted to it (red), and that motion in physics. Bottom: the same for my planned pickup.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="video-16">
+      <div class="notes">
+        <p class="step-num">Step F16</p>
+        <h3>The kid's hand, copied onto the Franka</h3>
+        <p>Back to the human video. The Franka stands where the kid stood, and its gripper copies the position and turn of the kid's right hand, frame by frame. When the kid's hand settles on the handle, the gripper closes and then follows the drill along its reconstructed path. There is no hover above the drill, no grasp from above and no straight lift: the motion is the kid's.</p>
+        <dl class="facts">
+          <div><dt>Reach</dt><dd>every frame; the kid's arm is shorter than the Franka's</dd></div>
+          <div><dt>Speed</dt><dd>at normal speed no plan stays within the joint speed limits; 3&times; slower, all do</dd></div>
+          <div><dt>Shoulder</dt><dd>joint 2 at its limit for half the motion: the Franka's shoulder sits higher than the kid's</dd></div>
+          <div><dt>Copied exactly</dt><dd>lifts 7.5 of 22.5 cm; the drill is pushed 1 cm before the grasp</dd></div>
+          <div><dt>With 2 small fixes</dt><dd>lifts 22.3 of 22.5 cm; nothing touched before the grasp</dd></div>
+        </dl>
+        <p class="change limit"><b>Why the exact copy fails:</b> the Franka Hand is 21 cm wide, much bigger than a child's hand, so the kid's approach runs it into the drill. And the kid grips the top of the handle, 5.9 cm from the drill's center of mass. A whole hand holds that; with two finger pads the drill swings out.</p>
+        <p class="change"><b>The two fixes:</b> grasp 2 cm lower on the handle (2.4 cm from the center of mass), and for the last 0.5 s before the grasp, move straight in at the hand's angle. <b>Still open:</b> when the kid turns the drill, it swings 29&deg; in the fingers and ends up 6.2 cm from its path on average. A pass needs less than 5 cm.</p>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-16.mp4" poster="GRAIL_Franka/posters/franka-16.jpg" width="1458" height="864" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Left: the kid's video. Middle and right: the Franka in physics, played 3&times; faster so all three line up.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="video-results">
+      <div class="notes">
+        <p class="step-num">Results</p>
+        <h3>Every week-3 motion in physics</h3>
+        <p>A pass means the drill is lifted at least 80% of the way, stays within 5 cm of its path on average, and doesn't drop in the final hold.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="results">
+          <thead><tr><th>Motion</th><th>Lift in physics</th><th>Drill vs. its path</th><th>Result</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Planned pickup (my control)</td><td class="count">13.8 of 15.0 cm</td><td class="count">1.8 cm</td><td class="count hit">pass</td><td>grasp from above across the drill's body</td></tr>
+            <tr><td>Planned pickup, read from its video</td><td class="count">13.1 of 15.1 cm</td><td class="count">3.1 cm</td><td class="count hit">pass</td><td>shows that reading joints from a video works</td></tr>
+            <tr><td>Best Wan video (round 2, seed 43)</td><td class="count">0 cm</td><td class="count">31.5 cm</td><td class="count">fail</td><td>gripper closes 10 cm from the drill</td></tr>
+            <tr><td>Kid's hand, copied exactly</td><td class="count">7.5 of 22.5 cm</td><td class="count">19.9 cm</td><td class="count">fail</td><td>approach bumps the drill; grip too far from the center of mass</td></tr>
+            <tr><td>&nbsp;+ grasp 2 cm lower</td><td class="count">13.5 of 22.5 cm</td><td class="count">23.8 cm</td><td class="count">fail</td><td>approach still bumps the drill</td></tr>
+            <tr><td>&nbsp;+ straight-in final approach</td><td class="count">22.3 of 22.5 cm</td><td class="count">6.2 cm</td><td class="count">fail, close</td><td>drill swings 29&deg; when the kid turns it</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section id="more-motions" aria-labelledby="more-motions-title">
+  <div class="section-head">
+    <p class="eyebrow">Pipeline 2, week 3, continued</p>
+    <h2 id="more-motions-title">More motions: copy the object, not the hand</h2>
+    <p>Copying the kid's hand came close for the drill pickup (F16). Next I checked whether that works for other objects and other actions, and whether the Franka can do those actions at all. Copying the hand mostly failed for reasons of the robot's body, so I switched to having the Franka copy what the object does, with a grasp of its own. That last test is still running: 8 of its 12 videos are done.</p>
+  </div>
+  <div class="steps">
+
+    <article class="step wide" id="motions-17">
+      <div class="notes">
+        <p class="step-num">Step F17</p>
+        <h3>NVIDIA's released pickups, the person's hand copied</h3>
+        <p>The hand copy from F16, 3&times; slower, on 20 of NVIDIA's released reconstructions. The Franka stands where the person stood. Its gripper follows the person's right palm, closes when the hand settles on the object, and then follows the object. I ran each one copied exactly and with F16's two fixes.</p>
+        <dl class="facts">
+          <div><dt>Pass</dt><dd>2 of 20: milk (exact copy) and ketchup (with the fixes)</dd></div>
+          <div><dt>For comparison</dt><dd>the Franka's own grasp and a straight 20 cm lift picked up 9 of 14 of the same objects (F11)</dd></div>
+          <div><dt>Carrying</dt><dd>people lift these objects 21&ndash;78 cm and carry them away; for 10 of 20 the arm loses the hand's path</dd></div>
+        </dl>
+        <p class="change limit"><b>Why it fails:</b> mostly the robot's body, not the video. The Franka Hand is 21 cm wide, has two fingers, opens 8 cm, and its joints are slower than a person's.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="results">
+          <thead><tr><th>Why the exact copy fails</th><th>Objects</th></tr></thead>
+          <tbody>
+            <tr><td>The hand hits the table: people reach in low over it</td><td>banana, bowl, cake, ketchup, kettle</td></tr>
+            <tr><td>The gripper bumps the object before it closes</td><td>bell pepper, cereal, potato, rolling pin, spray</td></tr>
+            <tr><td>The person's grip is wider than the 8 cm gripper</td><td>canned food 9.3 cm, jug 9.7 cm, mug 11.3 cm</td></tr>
+            <tr><td>Two fingers can't hold where the person held</td><td>coffee cup, water bottle</td></tr>
+            <tr><td>Out of reach in time, or the arm can't keep up</td><td>apple, pan, teapot, wine</td></tr>
+            <tr><td>Pass</td><td>milk</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="step wide" id="motions-18">
+      <div class="notes">
+        <p class="step-num">Step F18</p>
+        <h3>Seven new actions from Wan</h3>
+        <p>In the fixed scene (F12), Wan 2.2 animated the kid doing seven other things with the drill: place it elsewhere, push it, turn it around, tip it over, lift it to eye level, lift it with both hands, and pass it to the left hand. One video each, seed 42. All seven reconstructions passed GRAIL's quality checks. I tried each action two ways: copying the kid's hand (F16), and the Franka's own grasp following the drill's whole path, at the 5 mounts that worked best for the released pickups.</p>
+        <dl class="facts">
+          <div><dt>Hand copied</dt><dd>1 of 7 passes: lift to eye level</dd></div>
+          <div><dt>Own grasp</dt><dd>2 of 7: lift to eye level (4 of 5 mounts) and turn around (2 of 5)</dd></div>
+          <div><dt>What Wan drew</dt><dd>push, tip over, eye level, two hands and hand over as asked; &ldquo;place&rdquo; and &ldquo;turn around&rdquo; came out as the same lift and set-down (turned only 29&deg;)</dd></div>
+        </dl>
+        <p class="change limit"><b>Correction:</b> at first I read Wan's push as barely moving the drill. It actually slides about 12 cm, but the reconstruction's last frame jumps back 10 cm. End positions are now averaged over the last 10% of the motion.</p>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-17.mp4" poster="GRAIL_Franka/posters/franka-17.jpg" width="2100" height="1068" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>Top: Wan's seven videos. Bottom: the Franka copying the kid's hand in physics (the better of exact and 2 fixes), played 3&times; faster to line up.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="motions-18-results">
+      <div class="notes">
+        <p class="step-num">Results</p>
+        <h3>Seven actions in physics</h3>
+        <p>A pass for the hand copy follows the rule above (F16). Own grasp: how many of the 5 mounts pass.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="results">
+          <thead><tr><th>Action</th><th>Kid's hand copied: exact / 2 fixes</th><th>Franka's own grasp</th></tr></thead>
+          <tbody>
+            <tr><td>Place it elsewhere</td><td>fail / close: lifts 19.0 of 20.1 cm, 5.1 cm off its path</td><td class="count">0 of 5</td></tr>
+            <tr><td>Push it across the table</td><td>fail / fail: 8.7 / 7.7 cm off its path</td><td>not tried: the planner could only lift then (F19 adds a push)</td></tr>
+            <tr><td>Turn it around</td><td>fail / fail</td><td class="hit">2 of 5 (the drill turned only 29&deg;)</td></tr>
+            <tr><td>Tip it over</td><td>fail / fail</td><td>0 of 5: the wrist runs out of range</td></tr>
+            <tr><td>Lift to eye level</td><td class="hit">pass / pass</td><td class="count hit">4 of 5</td></tr>
+            <tr><td>Lift with both hands</td><td>fail / fail</td><td class="count">0 of 5</td></tr>
+            <tr><td>Pass to the left hand</td><td>fail / fail: one arm</td><td class="count">0 of 5</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="step wide" id="motions-19">
+      <div class="notes">
+        <p class="step-num">Step F19</p>
+        <h3>Copy the object, not the hand</h3>
+        <p>Almost every hand-copy failure came from the human hand not fitting the robot. The drill's own path is something the Franka can often follow. So the Franka now copies what the object does: it plans its own grasp, starting from where the kid held the drill, and follows the drill's reconstructed path 3&times; slower. Published work on robots imitating generated videos also tracks the object rather than the hand.</p>
+        <dl class="facts">
+          <div><dt>Tasks</dt><dd>4 simple ones a one-armed, two-finger robot can do: lift, place elsewhere, turn around, push across the table</dd></div>
+          <div><dt>Videos</dt><dd>3 Wan seeds per task (42, 1, 2), same first frame as F12</dd></div>
+          <div><dt>Video check</dt><dd>read from the drill's reconstructed path. Lift: at least 10 cm. Place: at least 15 cm away and back on the table. Turn: at least 90&deg;. Push: at least 10 cm, lifted no more than 2 cm</dd></div>
+          <div><dt>Franka</dt><dd>its own grasp near where the kid held the drill; for a push, closed fingers low behind the drill</dd></div>
+          <div><dt>Mounts</dt><dd>up to 105 base positions, stopping once 3 pass</dd></div>
+          <div><dt>Pass</dt><dd>the drill stays within 5 cm of its path on average; a place also ends within 5 cm of the kid's spot, and a turn within 30&deg; of the kid's turn</dd></div>
+        </dl>
+        <p class="change"><b>Two planner fixes along the way:</b> a pinch straight across the drill's barrel (the old grasp at the center of mass closed on a diagonal and slipped; 1 of 7 held), and when a grasp slips in physics, the same mount is planned again without it.</p>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-18.mp4" poster="GRAIL_Franka/posters/franka-18.jpg" width="1920" height="540" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>The Franka's own grasp following the drill's path in two of F18's videos, in physics, 3&times; faster. Left: turn around (in Wan's video the drill turned only 29&deg;). Right: lift to eye level.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="motions-20">
+      <div class="notes">
+        <p class="step-num">Step F20</p>
+        <h3>Simple tasks: from a Wan video to the Franka</h3>
+        <p>Lift and place work. In every lift and place video so far, the Franka reproduces the drill's motion in physics at several mounts. Turning doesn't work yet, because Wan hasn't drawn it: in 3 tries the drill turned 21&ndash;31&deg;, not 90&deg; or more. Pushes are borderline. Wan's drill slides 10&ndash;13 cm, but in the reconstruction it also rises 2.2 cm, just over the 2 cm limit. The same reconstruction puts the drill 1.6 cm below the table, so that 2 cm is within its error.</p>
+        <dl class="facts">
+          <div><dt>Best lift</dt><dd>Wan lifts the drill 61 cm; the Franka follows within 0.5 cm on average</dd></div>
+          <div><dt>Best place</dt><dd>the drill carried 25 cm and set down 1.5 cm from the kid's spot</dd></div>
+          <div><dt>Push move</dt><dd>on F18's push video, the Franka slides the drill 12 cm along its path at 2 of 3 mounts</dd></div>
+        </dl>
+        <p class="change limit"><b>Still running:</b> the seed-2 videos, and an extra run that lets pushes rise up to 3 cm. <b>Found:</b> the same grasp works at some mounts and fails at others, because the Franka Hand's palm ends only 5 mm above the drill and in physics it sometimes lands on it. Next I'll plan with 1.5 cm instead.</p>
+      </div>
+      <figure>
+        <video src="GRAIL_Franka/videos/franka-19.mp4" poster="GRAIL_Franka/posters/franka-19.jpg" width="1684" height="720" controls muted loop playsinline preload="none" data-autoplay></video>
+        <figcaption>The best video so far for each task: Wan's video (left) and the Franka in physics at its best mount (right), 3&times; faster. Turn and push are empty: their videos don't pass the video check yet.</figcaption>
+      </figure>
+    </article>
+
+    <article class="step wide" id="motions-results">
+      <div class="notes">
+        <p class="step-num">Results so far</p>
+        <h3>Four tasks, three seeds</h3>
+        <p>Each cell first asks whether Wan's video shows the task. If it does, it gives how many of the mounts tried let the Franka do it in physics, and how far the drill strays from its path at the best one.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="results">
+          <thead><tr><th>Task</th><th>Seed 42</th><th>Seed 1</th><th>Seed 2</th></tr></thead>
+          <tbody>
+            <tr><td>Lift</td><td class="hit">6 of 12 mounts, 0.5 cm (Wan lifts it 61 cm)</td><td class="hit">6 of 6 mounts, 1.2 cm (lifts it 42 cm)</td><td>running</td></tr>
+            <tr><td>Place elsewhere</td><td class="hit">5 of 12 mounts, 1.0 cm (carried 25 cm)</td><td class="hit">7 of 12 mounts, 2.4 cm (carried 19 cm)</td><td>running</td></tr>
+            <tr><td>Turn around</td><td>video: turned only 31&deg;</td><td>video: turned only 21&deg; (GRAIL also rejected the reconstruction)</td><td>running</td></tr>
+            <tr><td>Push across</td><td>video: slides 10 cm, rises 2.2 cm</td><td>video: slides 13 cm, rises 2.2 cm</td><td>running</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section id="fixes" aria-labelledby="fixes-title">
+  <div class="section-head">
+    <p class="eyebrow">Along the way</p>
+    <h2 id="fixes-title">Problems I hit and fixed this week</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Where</th><th>Problem</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td class="scope">F12</td><td>Blender's CPU mode still used the GPU and ran out of memory while Wan was running.</td><td>Hide the GPU from Blender for CPU renders; a stopped render resumes from its last frame.</td></tr>
+        <tr><td class="scope">F13&ndash;F14</td><td>Wan grew new limbs on the Franka.</td><td>A first frame with the gripper near the drill, a prompt that says the arm is rigid, and negative prompts for extra arms. The arm stayed rigid, but the drill still moved without contact.</td></tr>
+        <tr><td class="scope">F15</td><td>A strong smoothness term made the joint fit fall behind fast moves.</td><td>A weak smoothness term, with each frame starting from the last frame's fit.</td></tr>
+        <tr><td class="scope">F16</td><td>Some plans flipped the arm to another joint solution, 18&times; too fast.</td><td>Several IK starting poses, and enough time to leave the ready pose within the joint speed limits.</td></tr>
+        <tr><td class="scope">F18</td><td>For motions without a lift, the pass rule only looked at the last frame, so a hand-copied push 8.7 cm off its path counted as a pass.</td><td>Judge them on the path after the grasp, the distance travelled and where the object ends.</td></tr>
+        <tr><td class="scope">F18</td><td>A reconstruction's last frame can jump: Wan's pushed drill &ldquo;returned&rdquo; 10 cm, so I first read the push as barely moving.</td><td>End positions averaged over the last 10% of the motion.</td></tr>
+        <tr><td class="scope">F19</td><td>The planner could only plan motions with a lift.</td><td>A push: closed fingers behind the object, 3.5 cm above the table, approach pitched down 15&ndash;30&deg;. With a level hand, the wrist would scrape the table.</td></tr>
+        <tr><td class="scope">F19</td><td>The grasp from above at the center of mass closed on a diagonal cut; the drill squeezed out (1 of 7 held).</td><td>Pinch straight across the object's long axis, and plan the mount again without any grasp that slips in physics.</td></tr>
+        <tr><td class="scope">F19</td><td>Physics checks waited hours for the one GPU behind video generation.</td><td>Run a whole batch of physics checks each time the GPU frees up.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="next" aria-labelledby="next-title">
+  <div class="section-head">
+    <p class="eyebrow">Next</p>
+    <h2 id="next-title">What comes next</h2>
+  </div>
+  <ul class="next">
+    <li><b>Finish the simple tasks</b> (F20): the seed-2 videos, the extra push run and the final clip, today.</li>
+    <li><b>Turning.</b> Wan hasn't drawn a real turn of the drill in 3 tries. Try a prompt or first frame that shows the turn more clearly, or a bigger video model.</li>
+    <li><b>More room for the palm.</b> Plan the Franka Hand's palm 1.5 cm above the object instead of 5 mm, so that a grasp works at more mounts.</li>
+    <li><b>A fair limit for pushes.</b> A reconstruction's height wanders about 2 cm while the object slides, so a 2 cm &ldquo;no lift&rdquo; limit is too tight.</li>
+    <li><b>A stronger video model,</b> to decide with my mentor. Wan 2.2-5B fails at robot physics here. Options: Wan 2.2's larger A14B model, which would be slow on my GPU, or a small paid test of Kling or Veo, about $40 across four models.</li>
+    <li><b>Exact copy or small fixes?</b> Should the Franka copy the kid's hand exactly, or may it make small changes like the two in F16?</li>
+    <li><b>A person sized for the robot.</b> In new scenes, should the person in the first frame be sized and placed to suit the Franka?</li>
+    <li><b>GPU access for training.</b> GRAIL's policy training expects 8 GPUs; I have one RTX 3090.</li>
+    <li><b>Imitation learning or reinforcement learning</b> for the Franka, to decide with my mentor.</li>
+    <li><b>What the arm copies from the person</b>, to decide with my mentor: grasp and lift (A, done), the object's path with the Franka's own grasp (B, F19&ndash;F20: works for lift and place), or the person's full motion on slow, small motions only (C, F16&ndash;F18: mostly fails).</li>
+    <li><b>Grasps that differ from the person's.</b> For three objects the Franka grasps the center of mass, not where the person held it. Is that fine for training data?</li>
+    <li><b>Object weights.</b> Every released object weighs 1 kg in simulation, even the banana. Real weights would make many grasps easier.</li>
+    <li><b>More of the released pickups.</b> 20 of NVIDIA's 2,991 so far, at the &minus;30&deg;, 0.7 m table mount.</li>
+    <li><b>The objects that still fail:</b> kettle and teapot handles, the pan, canned food, and objects wider than the 8 cm gripper.</li>
+    <li><b>Steadier grasp.</b> Remove the 24&deg; tilt of the drill while the fingers close (F6), and its 29&deg; swing when the kid turns it (F16).</li>
+  </ul>
+</section>
+
+<nav class="pager" aria-label="Pages">
+  <a href="week2.html">&larr; Week 2</a>
+  <a href="index.html">Overview</a>
+  <span></span>
+</nav>
+
+</div>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var videos = document.querySelectorAll("video[data-autoplay]");
+  if (reduce || !("IntersectionObserver" in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      var v = e.target;
+      if (e.isIntersecting && e.intersectionRatio >= 0.5) {
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
+      } else if (!v.paused) {
+        v.pause();
+      }
+    });
+  }, { threshold: [0, 0.5] });
+  videos.forEach(function (v) { io.observe(v); });
+})();
+</script>
+</body>
+</html>
